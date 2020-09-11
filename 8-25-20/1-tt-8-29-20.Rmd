@@ -1,0 +1,165 @@
+---
+title: 'Tidy Tuesday Attempt # 1'
+author: "Corey Maxedon"
+date: "8/29/2020"
+output:
+  html_document:
+    css:
+    - /Users/coreymaxedon/Documents/Programming/GitHub/coreymaxedon.github.io/assets/css/main.css
+    - /Users/coreymaxedon/Documents/Programming/GitHub/coreymaxedon.github.io/assets/css/noscript.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+\p
+\p
+
+This is my very first attempt at a Tidy Tuesday Challenge. I have been learning R for a little over 
+a year. I've known about Tidy Tuesday, but I never felt comfortable enough with my programming 
+knowledge to actually attempt it. I've finally came to the conclusion that it doesn't matter 
+where you are in your coding journey, you just need to step outside the box and go for it.
+I also finally read [R for Data Science](https://r4ds.had.co.nz) by Hadley Wickham and Garrett Grolemund. 
+It taught me a lot of important information to at least start off on the right foot and see 
+what I can do. I'm also currently enrolled in an Exploratory Data Analysis class at Indiana University 
+as part of my Master of Statistics program. We use the tidyverse quite a bit and are even referenced the 
+R4DS book from time to time. I'm excited to begin so here we go. I will try to give as much commentary 
+as I can along the way as I think about the direction I want to take this data.
+
+First thing is first. Let's load the tidyverse library and retrieve the data for this week's Tidy 
+Tuesday data. Typically, I load all libraries in the first chunk, but since I am doing a commentary, 
+I will load as I go. Also, I will get the data through the tidytuesdayR library. (Pro tip: Use snippets! *tv* then (shift + 
+tab) populates library(tidyverse) and *r* then (shift + tab) populates a new r chunk. Very handy!)
+
+```{r Load}
+# install.packages("tidyverse")
+library(tidyverse)
+# install.packages("tidytuesdayR")
+library(tidytuesdayR)
+
+```
+
+In future weeks, I will likely use the template that comes with the tidytuesdayR package, but for my first attempt, I will use my own organization structure. The template can be used as follows:
+
+```{r Example 1, eval=FALSE}
+tidytuesdayR::use_tidytemplate(name = "My Super Great TidyTuesday.Rmd")
+
+```
+
+There are some useful techniques to use from this template. One being putting eval = interactive() in 
+the chunk to learn more about the data for the week. We are ready to retrieve the data and learn more 
+about it.
+
+```{r Retrieve}
+# tt <- tt_load("2020-8-25")
+tt <- read_rds("tt-8-25-20.rds")
+
+```
+
+```{r Information, eval=interactive()}
+tt
+
+```
+
+This week's data is about a show called *Chopped*. This is a cooking show where four chefs compete 
+for $10,000 throughout 3 rounds. After each round, a chef gets "chopped." Let's look at the data.
+
+```{r View Data}
+tt.df <- tt$chopped
+str(tt.df)
+
+```
+
+It appears the data is a little untidy. Based on a brief glance, it seems like the contestant's 
+state can be found in the information section. Also, each contestant has their own column. It would be 
+slightly more tidy is we "pivot longer" and create a row for each candidate. The information should stay with the 
+candidate, so I will merge the name and information columns and separate after the pivot is finished. Once 
+this is done, it will be simple to extract the state from the candidate's information section with str_trunc 
+since the state is normally at the end of the description.
+
+```{r Transform}
+tt.transform <- tt.df %>%
+    unite(col = "contestant1", c(contestant1, contestant1_info), sep = " --- ") %>%
+    unite(col = "contestant2", c(contestant2, contestant2_info), sep = " --- ") %>%
+    unite(col = "contestant3", c(contestant3, contestant3_info), sep = " --- ") %>%
+    unite(col = "contestant4", c(contestant4, contestant4_info), sep = " --- ") %>%
+    pivot_longer(cols = c(contestant1, contestant2, contestant3, contestant4), 
+                 names_to = "contestant", values_to = "name") %>%
+    separate(name, into = c("name", "information"), sep = " --- ") %>%
+    mutate(state = str_trunc(information, width = 2, 
+                              side = "left", ellipsis = ""), 
+           state = ifelse(state %in% state.abb, state, NA)) %>%
+    filter(!is.na(state))
+
+```
+
+With this data, it appears an easy comparison can be made between the number of contestants from each 
+state and the descriptive statistics on rating per state. I have never made a dual axis plot in 
+R so it may be a fun analysis if we try to implement that functionality in some way.
+
+```{r Plot}
+tt.transform %>%
+    group_by(state) %>%
+    summarize(n = n(),
+             mean_episode_rating = mean(episode_rating, na.rm = TRUE), 
+             median_episode_rating = median(episode_rating, na.rm = TRUE),
+             min_episode_rating = min(episode_rating, na.rm = TRUE),
+             max_episode_rating = max(episode_rating, na.rm = TRUE),
+             .groups = "keep") %>%
+    ggplot(aes(x = state)) +
+        geom_col(aes(y = n, fill = n)) +
+        geom_point(aes(y = mean_episode_rating * 80, color = "yellow")) +
+        geom_point(aes(y = min_episode_rating * 80, color = "red")) +
+        geom_point(aes(y = max_episode_rating * 80, color = "green")) +
+        scale_fill_gradient2(midpoint = 400, low = "red", mid = "yellow",
+                            high = "green", space = "Lab" ) +
+        scale_y_continuous(
+                name = "# of Contestants",
+                sec.axis = sec_axis(~./80, name="Median Episode Rating", 
+                                    breaks = 0:10)) +
+        labs(title = "Contestants and Rating by State",
+             x = "State", fill = "Contestants") +
+        scale_color_manual(name = 'Rating', 
+                           values =c('green'='green','yellow'='yellow','red'='red'), 
+                           labels = c('Max.','Median', 'Min.')) +
+        coord_flip() +
+        theme_minimal()
+
+```
+
+I am satisfied with the end result. There were other directions this data could've been taken, such as 
+looking at the individual ingredients used by show, but for a first attempt at a Tidy Tuesday, 
+this graph makes me proud of how far I have come in my wrangling and visualization learning. Always keep 
+learning!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

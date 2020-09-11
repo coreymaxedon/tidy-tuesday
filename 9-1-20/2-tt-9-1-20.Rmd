@@ -1,0 +1,155 @@
+---
+title: "Tidy Tuesday #2: 9-1-20"
+date: 2020-09-09
+output:
+  html_document:
+    css:
+    - /Users/coreymaxedon/Documents/Programming/GitHub/coreymaxedon.github.io/assets/css/main.css
+    - /Users/coreymaxedon/Documents/Programming/GitHub/coreymaxedon.github.io/assets/css/noscript.css
+---
+
+## Tidy Tuesday Summary
+
+This week I was pretty excited to attack this data set. I am from central Illinois and agriculture is a major part of my life. The Tidy Tuesday data is about crop yields over the years. The data was retrieved from *Our World in Data*. For ease, I decided to use the TidyTuesdayR package template for my analysis. Upon loading, I discovered 5 different data sets with all kinds of information, but each table had a country and a year. I decided to combine all the tables with a left join. I thought it would be interesting to see how farming has changed over the years in the United States so I standardized the values into a percentage based on the respective elements start date, most commonly, 1961. There is quite a bit of information contained within the plot. We can see that the amount of land needed to produce the same amount of crops has significantly decreased over the years. Also, the amount of tractors needed for the same size of land has went relatively unchanged. The most interesting aspect is how crop yields have increased proportionately to population growth over the years. It seems population is a major driver for the need of increased crop production. As I said, this connection is proportionate. These crops also feed animals. Animal production has surely seen the same trend as population increases. Therefore, it makes sense that crop yield would need to outpace population growth on average. Further, land needed for a fixed amount of crops has seen a decrease with population growth. People need a place to live. More people need more places to live and that takes up space. Population growth also seems to be driving innovation and engineering to make the most of the land we have to use. This analysis has turned out to be incredibly fascinating. It has been a pleasure diving into this #TidyTuesday.
+
+
+## Analysis Section
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+```
+
+# Load the weekly Data
+
+Dowload the weekly data and make available in the `tt` object.
+
+```{r Load}
+# tt <- tt_load("2020-09-01")
+tt <- read_rds("tt-9-1-20.rds")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+corn <- read_csv("cornyields.csv") %>%
+            rename(`Corn (tonnes per hectare)` = `Corn yield (USDA (2017) & FAO (2017))`)
+
+crop <- tt$key_crop_yields
+land <- tt$arable_land_pin
+fertilizer <- tt$cereal_crop_yield_vs_fertilizer_application
+tractor <- tt$cereal_yields_vs_tractor_inputs_in_agriculture %>%
+                mutate(Year = as.numeric(Year))
+yield <- tt$land_use_vs_yield_change_in_cereal_production
+
+crops <- crop %>%
+    left_join(land) %>%
+    left_join(corn) %>%
+    left_join(fertilizer) %>%
+    left_join(tractor) %>%
+    filter(Entity == "United States") %>%
+    rename(wheat = `Wheat (tonnes per hectare)`, 
+           soybeans = `Soybeans (tonnes per hectare)`,
+           barley = `Barley (tonnes per hectare)`,
+           land = `Arable land needed to produce a fixed quantity of crops ((1.0 = 1961))`,
+           nitrogen = `Nitrogen fertilizer use (kilograms per hectare)`, 
+           tractors = `Tractors per 100 sq km arable land`,
+           corn = `Corn (tonnes per hectare)`,
+           population = `Total population (Gapminder)`) %>%
+    select(Year, wheat, soybeans, barley, land, nitrogen, tractors,
+           population, corn) %>%
+    mutate(wheat = wheat / wheat[1], 
+           soybeans = soybeans / soybeans[1],
+           barley = barley / barley[1],
+           land = land / land[1],
+           nitrogen = nitrogen / nitrogen[42],
+           tractors = tractors / tractors[1],
+           corn = corn / corn[1],
+           population = population / population[1])
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+ggplot(crops, aes(x = Year)) +
+    geom_line(aes(y = wheat, 
+                  color = "Wheat")) +
+    geom_line(aes(y = corn, 
+                  color = "Corn")) +
+    geom_line(aes(y = soybeans, 
+                  color = "Soybeans")) +
+    geom_line(aes(y = barley, 
+                  color = "Barley")) +
+    geom_line(aes(y = land, 
+              color = "Arable land needed to produce a fixed quantity of crops")) +
+    geom_line(aes(y = nitrogen, 
+              color = "Nitrogen fertilizer use")) +
+    geom_line(aes(y = tractors, 
+                  color = "Tractors needed for a fixed quantity of land")) +
+    geom_line(aes(y = population, 
+              color = "Total population")) +
+    labs(title="Farming over Time", subtitle = "United States, 1961-2018",
+         x = "Year", y = "% Change since 1961", 
+         caption = "Twitter: @Corey_Maxedon | Source: Our World in Data") +
+    scale_color_manual(name="",values=
+       c("Corn"="dark green",
+         "Soybeans"="green",
+         "Wheat"="yellow",
+         "Barley"="brown",
+         "Total population"="cyan",
+         "Arable land needed to produce a fixed quantity of crops"="red",
+         "Tractors needed for a fixed quantity of land"="purple",
+         "Nitrogen fertilizer use"="blue")) +
+    theme(legend.position="bottom", legend.title = element_text(size = 5), 
+           legend.text = element_text(size = 6)) +
+    guides(color=guide_legend(nrow=2, byrow=TRUE, override.aes = list(size = 0.5))) +
+    ylim(0, 3)
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+# This will save your most recent plot
+ggsave(
+  filename = "tt-9-1-20.jpg",
+  device = "jpg")
+
+```
